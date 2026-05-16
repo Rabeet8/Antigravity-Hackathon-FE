@@ -1,56 +1,75 @@
-# Welcome to your Expo app 👋
+# 🛠️ Kaam Karo - Professional Home Services
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+![Kaam Karo Mockup](/Users/rabeet/.gemini/antigravity/brain/4417c4ce-29dc-47ca-b489-03d97436179a/kaam_karo_mockup_1778945472983.png)
 
-## Get started
+**Kaam Karo** is a premium, localized service booking application designed for the Pakistani market. It connects users with verified professionals for everything from AC repair and plumbing to electrical work and home cleaning.
 
-1. Install dependencies
+## ✨ Features
 
+- **🔍 Smart Search**: Quickly find the service you need with an intuitive search bar and voice support.
+- **📍 Real-time Tracking**: Watch your service provider arrive in real-time with our integrated tracking system.
+- **⚡ Quick Booking**: Book top-rated professionals in just a few taps.
+- **💬 Direct Chat**: Communicate directly with workers to discuss requirements or ask questions.
+- **📅 Booking Management**: Keep track of all your past and upcoming service requests in one place.
+- **🌓 Adaptive Theme**: Beautifully designed UI that supports both light and dark modes.
+
+## 🚀 Tech Stack
+
+- **Framework**: [Expo](https://expo.dev) / [React Native](https://reactnative.dev)
+- **Routing**: [Expo Router](https://docs.expo.dev/router/introduction) (File-based navigation)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **Icons**: [Lucide React Native](https://lucide.dev)
+- **Styling**: Native StyleSheet with a custom design system.
+
+## 🛠️ Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (LTS)
+- [Expo Go](https://expo.dev/go) app on your mobile device (to preview)
+
+### Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/yourusername/kaam-karo.git
+   cd kaam-karo
+   ```
+
+2. **Install dependencies:**
    ```bash
    npm install
    ```
 
-2. Start the app
-
+3. **Start the development server:**
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+4. **Run on your device:**
+   Scan the QR code with your Expo Go app (Android) or Camera app (iOS).
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## 📂 Project Structure
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```text
+kaam-karo/
+├── src/
+│   ├── app/           # Expo Router screens (Tabs, Modals, etc.)
+│   ├── components/    # Reusable UI components
+│   ├── constants/     # Theme, Colors, and Global Constants
+│   ├── hooks/         # Custom React Hooks
+│   └── assets/        # Images, Fonts, and Media
+├── app.json           # Expo configuration
+└── package.json       # Dependencies and Scripts
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## 🎨 Design Philosophy
 
-### Other setup steps
+Kaam Karo follows a **Clean & Vibrant** design language.
+- **Primary Color**: `#1DB954` (Growth & Trust)
+- **Secondary Color**: `#075E54` (Stability & Professionalism)
+- **Typography**: Focused on readability and localized context (Assalam-o-Alaikum!).
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+---
 
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Made with ❤️ for the Hackathon.
