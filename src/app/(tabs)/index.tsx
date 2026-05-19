@@ -7,7 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { Search, Mic, Plus, Snowflake, Wrench, Zap, Paintbrush, Hammer, Eraser, Info } from 'lucide-react-native';
+import { Search, Mic, Plus, Snowflake, Wrench, Zap, Paintbrush, Hammer, Eraser } from 'lucide-react-native';
 import { router } from 'expo-router';
 
 export default function HomeScreen() {
@@ -15,6 +15,11 @@ export default function HomeScreen() {
 
   const handleOpenChat = () => {
     router.push('/chat');
+  };
+
+  const handleBookNow = () => {
+    // Navigates directly to the chat screen with context for Roof Waterproofing
+    router.push('/chat?service=waterproofing');
   };
 
   return (
@@ -36,6 +41,7 @@ export default function HomeScreen() {
           <Mic size={20} color={theme.primary} />
         </View>
 
+        {/* Active tracking banner */}
         <View style={[styles.activeBanner, { backgroundColor: theme.primary }]}>
           <View style={styles.bannerIconContainer}>
             <Snowflake size={24} color={theme.primary} />
@@ -45,7 +51,7 @@ export default function HomeScreen() {
             <ThemedText style={styles.serviceNameText}>AC Technician</ThemedText>
             <ThemedText style={styles.etaText}>Arriving in 8 mins</ThemedText>
           </View>
-          <TouchableOpacity style={styles.trackButton}>
+          <TouchableOpacity style={styles.trackButton} onPress={() => router.push('/track')}>
             <ThemedText style={styles.trackButtonText}>Track</ThemedText>
           </TouchableOpacity>
         </View>
@@ -66,7 +72,12 @@ export default function HomeScreen() {
           <ServiceCard title="Cleaning" Icon={Eraser} />
         </View>
 
-        <TouchableOpacity style={styles.promoBanner} activeOpacity={0.9}>
+        {/* Book Now Promo Banner */}
+        <TouchableOpacity 
+          style={styles.promoBanner} 
+          activeOpacity={0.9}
+          onPress={handleBookNow}
+        >
           <Image 
             source={{ uri: 'https://images.unsplash.com/photo-1541888946425-d81bb19240f5?auto=format&fit=crop&q=80&w=800' }} 
             style={styles.promoImage} 
@@ -74,9 +85,9 @@ export default function HomeScreen() {
           <View style={styles.promoOverlay}>
             <ThemedText style={styles.promoTag}>MONSOON SPECIAL</ThemedText>
             <ThemedText style={styles.promoTitle}>20% off on Roof Waterproofing</ThemedText>
-            <View style={styles.bookNowButton}>
+            <TouchableOpacity style={styles.bookNowButton} onPress={handleBookNow} activeOpacity={0.8}>
               <ThemedText style={styles.bookNowText}>Book Now</ThemedText>
-            </View>
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
 
@@ -102,6 +113,7 @@ export default function HomeScreen() {
         </ScrollView>
       </ScrollView>
 
+      {/* Floating Action Button */}
       <TouchableOpacity 
         style={[styles.fab, { backgroundColor: theme.secondary }]}
         onPress={handleOpenChat}

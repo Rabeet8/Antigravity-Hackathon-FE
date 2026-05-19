@@ -18,7 +18,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.rabeet.kaamkaro"
+      "package": "com.rabeet.kaamkaro",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "output": "static",

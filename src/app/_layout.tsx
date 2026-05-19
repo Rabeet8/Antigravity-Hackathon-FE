@@ -12,6 +12,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
         <Stack.Screen name="chat" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="track" options={{ presentation: 'card' }} />
       </Stack>
     </ThemeProvider>
   );

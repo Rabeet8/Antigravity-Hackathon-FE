@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, View, ScrollView, TextInput, TouchableOpacity, Image, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -12,6 +12,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { runOrchestrator } from '@/services/orchestratorService';
 import { AgentTraceCard } from '@/components/agent-trace-card';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Message {
   id: string;
@@ -25,17 +26,14 @@ interface Message {
 
 export default function ChatScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const { service } = useLocalSearchParams();
+  const isWaterproofing = service === 'waterproofing';
+
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [activeAgentStep, setActiveAgentStep] = useState(0); // 0: None, 1: NER, 2: Search, 3: Ranking, 4: Booking, 5: Reminders
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'init-msg',
-      type: 'bot',
-      text: 'Assalam o Alaikum! 👋 Kaunsi service chahiye aaj?',
-      time: '10:00 AM',
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
 
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -51,12 +49,85 @@ export default function ChatScreen() {
     return `${hours}:${minutesStr} ${ampm}`;
   };
 
+  useEffect(() => {
+    setMessages([
+      {
+        id: 'init-msg',
+        type: 'bot',
+        text: 'Assalam o Alaikum! 👋 Kaunsi service chahiye aaj?',
+        time: formatTime(),
+      }
+    ]);
+  }, [service]);
+
+  const isServiceAvailable = (query: string): boolean => {
+    const q = query.toLowerCase().trim();
+    if (!q) return true;
+
+    const allowedKeywords = [
+      'hi', 'hello', 'hey', 'assalam', 'aoa', 'salam', 'yes', 'no', 'haan', 'ji', 'price', 'details', 'info',
+      'ac', 'air condition', 'air-conditioner', 'refrigerator', 'fridge', 'cooling',
+      'plumber', 'plumbing', 'leak', 'tap', 'pipe', 'flush', 'sink', 'toilet', 'drain',
+      'electrician', 'electricity', 'short circuit', 'fan', 'light', 'switch', 'wiring', 'ups', 'generator',
+      'paint', 'painter', 'painting', 'wall',
+      'carpenter', 'wood', 'door', 'window', 'cabinet', 'sofa', 'table', 'chair', 'furniture',
+      'clean', 'cleaning', 'maid', 'dusting', 'wash',
+      'waterproofing', 'water proof', 'roof waterproofing', 'monsoon special'
+    ];
+    
+    return allowedKeywords.some(keyword => q.includes(keyword));
+  };
+
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-  const handleSend = async () => {
-    if (!message.trim() || isSending) return;
+  const handleSend = async (customMessage?: string) => {
+    const rawMessage = customMessage !== undefined ? customMessage : message;
+    if (!rawMessage.trim() || isSending) return;
 
-    let userText = message.trim();
+    let userText = rawMessage.trim();
+    
+    // Check if the requested service is supported (only on the first user message)
+    const isFirstUserMessage = !messages.some(m => m.type === 'user');
+    if (isFirstUserMessage && !isServiceAvailable(userText)) {
+      if (customMessage === undefined) {
+        setMessage('');
+      }
+      setIsSending(true);
+
+      const timestamp = formatTime();
+      const userMsgId = Date.now().toString();
+
+      // Add user message to history
+      const userMsg: Message = {
+        id: userMsgId,
+        type: 'user',
+        text: userText,
+        time: timestamp,
+      };
+
+      // Add temporary thinking bubble
+      const thinkingMsgId = (Date.now() + 1).toString();
+      const thinkingMsg: Message = {
+        id: thinkingMsgId,
+        type: 'thinking',
+        text: 'Samajh raha hoon... 🤔 ...',
+      };
+
+      setMessages((prev) => [...prev, userMsg, thinkingMsg]);
+
+      await delay(1000);
+      setMessages((prev) => [
+        ...prev.filter((m) => m.id !== thinkingMsgId),
+        {
+          id: `not-avail-${Date.now()}`,
+          type: 'bot',
+          text: 'Ye service abhi available nhi hy',
+          time: formatTime(),
+        }
+      ]);
+      setIsSending(false);
+      return;
+    }
     
     // Proactive Context Merge: If responding to a missing location sector query,
     // merge the previous context so our stateless backend completes the booking successfully.
@@ -70,7 +141,9 @@ export default function ChatScreen() {
       }
     }
 
-    setMessage('');
+    if (customMessage === undefined) {
+      setMessage('');
+    }
     setIsSending(true);
 
     const timestamp = formatTime();
@@ -286,283 +359,329 @@ export default function ChatScreen() {
         </View>
       </View>
 
-      <ScrollView 
-        ref={scrollViewRef}
-        contentContainerStyle={styles.chatContent}
-        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        {messages.map((msg) => {
-          if (msg.type === 'bot') {
-            return (
-              <View key={msg.id} style={styles.botMessage}>
-                <ThemedText style={styles.botText}>{msg.text}</ThemedText>
-                {msg.time && <ThemedText style={styles.timeText}>{msg.time}</ThemedText>}
-              </View>
-            );
-          }
-
-          if (msg.type === 'thinking') {
-            return (
-              <View key={msg.id} style={styles.botMessage}>
-                <ThemedText style={styles.botText}>{msg.text}</ThemedText>
-              </View>
-            );
-          }
-
-          if (msg.type === 'status_loading') {
-            return (
-              <View key={msg.id} style={[styles.botMessage, { borderColor: theme.primary, borderWidth: 1, backgroundColor: '#F0FDF4', flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 }]}>
-                <ActivityIndicator size="small" color={theme.primary} />
-                <ThemedText style={{ fontWeight: '700', color: theme.primary, fontSize: 13, flex: 1 }}>
-                  {msg.text}
-                </ThemedText>
-              </View>
-            );
-          }
-
-          if (msg.type === 'user') {
-            return (
-              <View 
-                key={msg.id} 
-                style={[styles.userMessage, { backgroundColor: theme.backgroundSelected }]}
-              >
-                <ThemedText style={styles.userText}>{msg.text}</ThemedText>
-                {msg.time && (
-                  <ThemedText style={[styles.timeText, { textAlign: 'right' }]}>
-                    {msg.time}
-                  </ThemedText>
-                )}
-              </View>
-            );
-          }
-
-          if (msg.type === 'card') {
-            if (msg.cardType === 'extracted_info') {
+        <ScrollView 
+          ref={scrollViewRef}
+          contentContainerStyle={styles.chatContent}
+          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+        >
+          {messages.map((msg) => {
+            if (msg.type === 'bot') {
               return (
-                <View key={msg.id} style={[styles.summaryCard, { backgroundColor: '#FFFFFF', borderColor: '#E5E7EB' }]}>
-                  <View style={[styles.summaryHeader, { backgroundColor: '#F3F4F6' }]}>
-                    <Bot size={20} color={theme.primary} />
-                    <ThemedText style={[styles.summaryTitle, { color: '#374151' }]}>
-                      📝 Details Samjhi Gayeen
-                    </ThemedText>
-                  </View>
-                  
-                  <View style={styles.summaryItem}>
-                    <ThemedText style={styles.summaryLabel}>Intent</ThemedText>
-                    <ThemedText style={styles.summaryValue}>
-                      {msg.data.intent === 'book_service' ? 'Book Service' : msg.data.intent}
-                    </ThemedText>
-                  </View>
-                  <View style={styles.summaryItem}>
-                    <ThemedText style={styles.summaryLabel}>Service</ThemedText>
-                    <ThemedText style={[styles.summaryValue, !msg.data.service_type && { color: '#EF4444' }]}>
-                      {msg.data.service_type || 'Nahi mila ⚠️'}
-                    </ThemedText>
-                  </View>
-                  <View style={styles.summaryItem}>
-                    <ThemedText style={styles.summaryLabel}>Location</ThemedText>
-                    <ThemedText style={[styles.summaryValue, !msg.data.location && { color: '#EF4444' }]}>
-                      {msg.data.location || 'Nahi mila ⚠️'}
-                    </ThemedText>
-                  </View>
-                  <View style={styles.summaryItem}>
-                    <ThemedText style={styles.summaryLabel}>Time</ThemedText>
-                    <ThemedText style={[styles.summaryValue, !msg.data.time_normalized && { color: '#EF4444' }]}>
-                      {msg.data.time_normalized || 'Nahi mila ⚠️'}
-                    </ThemedText>
-                  </View>
-                  <View style={styles.summaryItem}>
-                    <ThemedText style={styles.summaryLabel}>Language</ThemedText>
-                    <ThemedText style={styles.summaryValue}>
-                      {msg.data.language_detected || 'Unknown'}
-                    </ThemedText>
-                  </View>
+                <View key={msg.id} style={styles.botMessage}>
+                  <ThemedText style={styles.botText}>{msg.text}</ThemedText>
+                  {msg.time && <ThemedText style={styles.timeText}>{msg.time}</ThemedText>}
                 </View>
               );
             }
 
-            if (msg.cardType === 'provider_list') {
+            if (msg.type === 'thinking') {
               return (
-                <View key={msg.id} style={[styles.summaryCard, { backgroundColor: '#FFFFFF', borderColor: '#DCFCE7' }]}>
-                  <View style={styles.summaryHeader}>
-                    <Radio size={20} color={theme.primary} />
-                    <ThemedText style={styles.summaryTitle}>🔍 Ranked Providers Near You</ThemedText>
+                <View key={msg.id} style={styles.botMessage}>
+                  <ThemedText style={styles.botText}>{msg.text}</ThemedText>
+                </View>
+              );
+            }
+
+            if (msg.type === 'status_loading') {
+              return (
+                <View key={msg.id} style={[styles.botMessage, { borderColor: theme.primary, borderWidth: 1, backgroundColor: '#F0FDF4', flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 }]}>
+                  <ActivityIndicator size="small" color={theme.primary} />
+                  <ThemedText style={{ fontWeight: '700', color: theme.primary, fontSize: 13, flex: 1 }}>
+                    {msg.text}
+                  </ThemedText>
+                </View>
+              );
+            }
+
+            if (msg.type === 'user') {
+              return (
+                <View 
+                  key={msg.id} 
+                  style={[styles.userMessage, { backgroundColor: theme.backgroundSelected }]}
+                >
+                  <ThemedText style={styles.userText}>{msg.text}</ThemedText>
+                  {msg.time && (
+                    <ThemedText style={[styles.timeText, { textAlign: 'right' }]}>
+                      {msg.time}
+                    </ThemedText>
+                  )}
+                </View>
+              );
+            }
+
+            if (msg.type === 'card') {
+              if (msg.cardType === 'extracted_info') {
+                return (
+                  <View key={msg.id} style={[styles.summaryCard, { backgroundColor: '#FFFFFF', borderColor: '#E5E7EB' }]}>
+                    <View style={[styles.summaryHeader, { backgroundColor: '#F3F4F6' }]}>
+                      <Bot size={20} color={theme.primary} />
+                      <ThemedText style={[styles.summaryTitle, { color: '#374151' }]}>
+                        📝 Details Samjhi Gayeen
+                      </ThemedText>
+                    </View>
+                    
+                    <View style={styles.summaryItem}>
+                      <ThemedText style={styles.summaryLabel}>Intent</ThemedText>
+                      <ThemedText style={styles.summaryValue}>
+                        {msg.data.intent === 'book_service' ? 'Book Service' : msg.data.intent}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.summaryItem}>
+                      <ThemedText style={styles.summaryLabel}>Service</ThemedText>
+                      <ThemedText style={[styles.summaryValue, !msg.data.service_type && { color: '#EF4444' }]}>
+                        {msg.data.service_type || 'Nahi mila ⚠️'}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.summaryItem}>
+                      <ThemedText style={styles.summaryLabel}>Location</ThemedText>
+                      <ThemedText style={[styles.summaryValue, !msg.data.location && { color: '#EF4444' }]}>
+                        {msg.data.location || 'Nahi mila ⚠️'}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.summaryItem}>
+                      <ThemedText style={styles.summaryLabel}>Time</ThemedText>
+                      <ThemedText style={[styles.summaryValue, !msg.data.time_normalized && { color: '#EF4444' }]}>
+                        {msg.data.time_normalized || 'Nahi mila ⚠️'}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.summaryItem}>
+                      <ThemedText style={styles.summaryLabel}>Language</ThemedText>
+                      <ThemedText style={styles.summaryValue}>
+                        {msg.data.language_detected || 'Unknown'}
+                      </ThemedText>
+                    </View>
                   </View>
-                  
-                  {msg.data.map((prov: any, idx: number) => (
-                    <View key={prov.provider_id || idx} style={[styles.summaryItem, { flexDirection: 'column', alignItems: 'flex-start', paddingVertical: 10 }]}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <View style={{ backgroundColor: theme.primary, borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center' }}>
-                            <ThemedText style={{ color: 'white', fontSize: 11, fontWeight: '700' }}>
-                              {prov.rank}
+                );
+              }
+
+              if (msg.cardType === 'provider_list') {
+                return (
+                  <View key={msg.id} style={[styles.summaryCard, { backgroundColor: '#FFFFFF', borderColor: '#DCFCE7' }]}>
+                    <View style={styles.summaryHeader}>
+                      <Radio size={20} color={theme.primary} />
+                      <ThemedText style={styles.summaryTitle}>🔍 Ranked Providers Near You</ThemedText>
+                    </View>
+                    
+                    {msg.data.map((prov: any, idx: number) => (
+                      <View key={prov.provider_id || idx} style={[styles.summaryItem, { flexDirection: 'column', alignItems: 'flex-start', paddingVertical: 10 }]}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <View style={{ backgroundColor: theme.primary, borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center' }}>
+                              <ThemedText style={{ color: 'white', fontSize: 11, fontWeight: '700' }}>
+                                {prov.rank}
+                              </ThemedText>
+                            </View>
+                            <ThemedText style={{ fontWeight: '800', color: '#075E54', fontSize: 14 }}>
+                              {prov.name}
                             </ThemedText>
                           </View>
-                          <ThemedText style={{ fontWeight: '800', color: '#075E54', fontSize: 14 }}>
-                            {prov.name}
+                          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                            <Star size={12} color="#EAB308" fill="#EAB308" />
+                            <ThemedText style={{ fontSize: 11, fontWeight: '700', color: '#15803D', marginLeft: 2 }}>
+                              {prov.rating || '4.5'}
+                            </ThemedText>
+                          </View>
+                        </View>
+                        
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: 4, paddingLeft: 26 }}>
+                          <ThemedText style={{ fontSize: 12, color: '#71796F' }}>
+                            Distance: {prov.distance || '2.0 km'}
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 12, fontWeight: '700', color: theme.secondary }}>
+                            Score: {prov.score}
                           </ThemedText>
                         </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
-                          <Star size={12} color="#EAB308" fill="#EAB308" />
-                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: '#15803D', marginLeft: 2 }}>
-                            {prov.rating || '4.5'}
+                        <ThemedText style={{ fontSize: 11, color: '#71796F', paddingLeft: 26, fontStyle: 'italic', marginTop: 2 }}>
+                          {prov.reasoning}
+                        </ThemedText>
+                      </View>
+                    ))}
+                  </View>
+                );
+              }
+
+              if (msg.cardType === 'booking_confirmed') {
+                return (
+                  <View key={msg.id} style={[styles.summaryCard, { backgroundColor: '#FFFFFF', borderColor: theme.primary, borderWidth: 1.5 }]}>
+                    <View style={[styles.summaryHeader, { backgroundColor: theme.backgroundSelected }]}>
+                      <CheckCircle2 size={20} color={theme.primary} />
+                      <ThemedText style={[styles.summaryTitle, { color: '#15803D' }]}>
+                        ✅ Appointment Receipt
+                      </ThemedText>
+                    </View>
+                    
+                    <View style={{ paddingVertical: 8, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F3F4F6', marginBottom: 6 }}>
+                      <ThemedText style={{ fontSize: 12, color: '#9CA3AF' }}>BOOKING REFERENCE</ThemedText>
+                      <ThemedText style={{ fontSize: 16, fontWeight: '800', color: theme.primary, marginTop: 2 }}>
+                        {msg.data.booking_id}
+                      </ThemedText>
+                    </View>
+
+                    <View style={styles.summaryItem}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Wrench size={14} color="#71796F" />
+                        <ThemedText style={styles.summaryLabel}>Service</ThemedText>
+                      </View>
+                      <ThemedText style={styles.summaryValue}>{msg.data.service}</ThemedText>
+                    </View>
+                    <View style={styles.summaryItem}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Award size={14} color="#71796F" />
+                        <ThemedText style={styles.summaryLabel}>Provider</ThemedText>
+                      </View>
+                      <ThemedText style={styles.summaryValue}>{msg.data.provider_name}</ThemedText>
+                    </View>
+                    <View style={styles.summaryItem}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Calendar size={14} color="#71796F" />
+                        <ThemedText style={styles.summaryLabel}>Time Slot</ThemedText>
+                      </View>
+                      <ThemedText style={styles.summaryValue}>{msg.data.slot}</ThemedText>
+                    </View>
+                    <View style={styles.summaryItem}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <MapPin size={14} color="#71796F" />
+                        <ThemedText style={styles.summaryLabel}>Location</ThemedText>
+                      </View>
+                      <ThemedText style={styles.summaryValue}>{msg.data.location}</ThemedText>
+                    </View>
+                    <View style={styles.summaryItem}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <DollarSign size={14} color="#71796F" />
+                        <ThemedText style={styles.summaryLabel}>Estimated Cost</ThemedText>
+                      </View>
+                      <ThemedText style={[styles.summaryValue, { color: theme.primary }]}>
+                        {msg.data.estimated_cost}
+                      </ThemedText>
+                    </View>
+
+                    <View style={{ backgroundColor: '#F9FAFB', padding: 8, borderRadius: 8, marginTop: 10 }}>
+                      <ThemedText style={{ fontSize: 13, color: '#374151', fontStyle: 'italic', textAlign: 'center' }}>
+                        "{msg.data.confirmation_message}"
+                      </ThemedText>
+                    </View>
+                  </View>
+                );
+              }
+
+              if (msg.cardType === 'reminder_set') {
+                return (
+                  <View key={msg.id} style={[styles.summaryCard, { backgroundColor: '#FFFFFF', borderColor: '#FEF08A' }]}>
+                    <View style={[styles.summaryHeader, { backgroundColor: '#FEF9C3' }]}>
+                      <Bell size={20} color="#CA8A04" />
+                      <ThemedText style={[styles.summaryTitle, { color: '#854D0E' }]}>
+                        🔔 Reminders Scheduled
+                      </ThemedText>
+                    </View>
+                    
+                    <View style={{ paddingVertical: 4 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 6 }}>
+                        <Clock size={16} color="#71796F" />
+                        <View style={{ flex: 1 }}>
+                          <ThemedText style={{ fontSize: 12, fontWeight: '700', color: '#374151' }}>
+                            Tonight 8:00 PM (Night Before)
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
+                            {msg.data.reminders_scheduled?.[0]?.message || 'Kal subah time pe service provider aayega. Tayyar rahein!'}
                           </ThemedText>
                         </View>
                       </View>
                       
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: 4, paddingLeft: 26 }}>
-                        <ThemedText style={{ fontSize: 12, color: '#71796F' }}>
-                          Distance: {prov.distance || '2.0 km'}
-                        </ThemedText>
-                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: theme.secondary }}>
-                          Score: {prov.score}
-                        </ThemedText>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 6, borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 6 }}>
+                        <Clock size={16} color="#71796F" />
+                        <View style={{ flex: 1 }}>
+                          <ThemedText style={{ fontSize: 12, fontWeight: '700', color: '#374151' }}>
+                            Tomorrow 9:00 AM (1 Hour Before)
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
+                            {msg.data.reminders_scheduled?.[1]?.message || 'Yaad dihani: 1 ghante mein provider aa raha hai!'}
+                          </ThemedText>
+                        </View>
                       </View>
-                      <ThemedText style={{ fontSize: 11, color: '#71796F', paddingLeft: 26, fontStyle: 'italic', marginTop: 2 }}>
-                        {prov.reasoning}
-                      </ThemedText>
-                    </View>
-                  ))}
-                </View>
-              );
-            }
-
-            if (msg.cardType === 'booking_confirmed') {
-              return (
-                <View key={msg.id} style={[styles.summaryCard, { backgroundColor: '#FFFFFF', borderColor: theme.primary, borderWidth: 1.5 }]}>
-                  <View style={[styles.summaryHeader, { backgroundColor: theme.backgroundSelected }]}>
-                    <CheckCircle2 size={20} color={theme.primary} />
-                    <ThemedText style={[styles.summaryTitle, { color: '#15803D' }]}>
-                      ✅ Appointment Receipt
-                    </ThemedText>
-                  </View>
-                  
-                  <View style={{ paddingVertical: 8, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F3F4F6', marginBottom: 6 }}>
-                    <ThemedText style={{ fontSize: 12, color: '#9CA3AF' }}>BOOKING REFERENCE</ThemedText>
-                    <ThemedText style={{ fontSize: 16, fontWeight: '800', color: theme.primary, marginTop: 2 }}>
-                      {msg.data.booking_id}
-                    </ThemedText>
-                  </View>
-
-                  <View style={styles.summaryItem}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Wrench size={14} color="#71796F" />
-                      <ThemedText style={styles.summaryLabel}>Service</ThemedText>
-                    </View>
-                    <ThemedText style={styles.summaryValue}>{msg.data.service}</ThemedText>
-                  </View>
-                  <View style={styles.summaryItem}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Award size={14} color="#71796F" />
-                      <ThemedText style={styles.summaryLabel}>Provider</ThemedText>
-                    </View>
-                    <ThemedText style={styles.summaryValue}>{msg.data.provider_name}</ThemedText>
-                  </View>
-                  <View style={styles.summaryItem}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Calendar size={14} color="#71796F" />
-                      <ThemedText style={styles.summaryLabel}>Time Slot</ThemedText>
-                    </View>
-                    <ThemedText style={styles.summaryValue}>{msg.data.slot}</ThemedText>
-                  </View>
-                  <View style={styles.summaryItem}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <MapPin size={14} color="#71796F" />
-                      <ThemedText style={styles.summaryLabel}>Location</ThemedText>
-                    </View>
-                    <ThemedText style={styles.summaryValue}>{msg.data.location}</ThemedText>
-                  </View>
-                  <View style={styles.summaryItem}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <DollarSign size={14} color="#71796F" />
-                      <ThemedText style={styles.summaryLabel}>Estimated Cost</ThemedText>
-                    </View>
-                    <ThemedText style={[styles.summaryValue, { color: theme.primary }]}>
-                      {msg.data.estimated_cost}
-                    </ThemedText>
-                  </View>
-
-                  <View style={{ backgroundColor: '#F9FAFB', padding: 8, borderRadius: 8, marginTop: 10 }}>
-                    <ThemedText style={{ fontSize: 13, color: '#374151', fontStyle: 'italic', textAlign: 'center' }}>
-                      "{msg.data.confirmation_message}"
-                    </ThemedText>
-                  </View>
-                </View>
-              );
-            }
-
-            if (msg.cardType === 'reminder_set') {
-              return (
-                <View key={msg.id} style={[styles.summaryCard, { backgroundColor: '#FFFFFF', borderColor: '#FEF08A' }]}>
-                  <View style={[styles.summaryHeader, { backgroundColor: '#FEF9C3' }]}>
-                    <Bell size={20} color="#CA8A04" />
-                    <ThemedText style={[styles.summaryTitle, { color: '#854D0E' }]}>
-                      🔔 Reminders Scheduled
-                    </ThemedText>
-                  </View>
-                  
-                  <View style={{ paddingVertical: 4 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 6 }}>
-                      <Clock size={16} color="#71796F" />
-                      <View style={{ flex: 1 }}>
-                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: '#374151' }}>
-                          Tonight 8:00 PM (Night Before)
-                        </ThemedText>
-                        <ThemedText style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
-                          {msg.data.reminders_scheduled?.[0]?.message || 'Kal subah time pe service provider aayega. Tayyar rahein!'}
-                        </ThemedText>
-                      </View>
-                    </View>
-                    
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 6, borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 6 }}>
-                      <Clock size={16} color="#71796F" />
-                      <View style={{ flex: 1 }}>
-                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: '#374151' }}>
-                          Tomorrow 9:00 AM (1 Hour Before)
-                        </ThemedText>
-                        <ThemedText style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
-                          {msg.data.reminders_scheduled?.[1]?.message || 'Yaad dihani: 1 ghante mein provider aa raha hai!'}
-                        </ThemedText>
-                      </View>
-                    </View>
-                    
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 6, borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 6 }}>
-                      <Clock size={16} color="#71796F" />
-                      <View style={{ flex: 1 }}>
-                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: '#374151' }}>
-                          Tomorrow 12:00 PM (Completion Check)
-                        </ThemedText>
-                        <ThemedText style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
-                          {msg.data.follow_up?.message || 'Kya service complete ho gayi? Apna feedback dein!'}
-                        </ThemedText>
+                      
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 6, borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 6 }}>
+                        <Clock size={16} color="#71796F" />
+                        <View style={{ flex: 1 }}>
+                          <ThemedText style={{ fontSize: 12, fontWeight: '700', color: '#374151' }}>
+                            Tomorrow 12:00 PM (Completion Check)
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
+                            {msg.data.follow_up?.message || 'Kya service complete ho gayi? Apna feedback dein!'}
+                          </ThemedText>
+                        </View>
                       </View>
                     </View>
                   </View>
-                </View>
-              );
+                );
+              }
+
+              if (msg.cardType === 'agent_trace') {
+                return (
+                  <AgentTraceCard 
+                    key={msg.id} 
+                    trace={msg.data} 
+                    executionTime={msg.executionTime} 
+                  />
+                );
+              }
             }
 
-            if (msg.cardType === 'agent_trace') {
-              return (
-                <AgentTraceCard 
-                  key={msg.id} 
-                  trace={msg.data} 
-                  executionTime={msg.executionTime} 
-                />
-              );
-            }
-          }
+            return null;
+          })}
+        </ScrollView>
 
-          return null;
-        })}
-      </ScrollView>
-
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
         {renderAgentLoader()}
-        <View style={styles.inputArea}>
+
+        {messages.length === 1 && !isSending && (
+          <View style={styles.quickChipsContainer}>
+            {isWaterproofing ? (
+              <>
+                <TouchableOpacity 
+                  style={[styles.quickChip, { borderColor: theme.primary }]}
+                  onPress={() => handleSend('Yes, book Clifton for tomorrow morning')}
+                >
+                  <ThemedText style={[styles.quickChipText, { color: theme.primary }]}>
+                    Yes, book Clifton for tomorrow morning
+                  </ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.quickChip, { borderColor: theme.primary }]}
+                  onPress={() => handleSend('Show details & price first')}
+                >
+                  <ThemedText style={[styles.quickChipText, { color: theme.primary }]}>
+                    Show details & price first
+                  </ThemedText>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity 
+                  style={[styles.quickChip, { borderColor: theme.primary }]}
+                  onPress={() => handleSend('AC Repair service book karni hai Clifton ke liye')}
+                >
+                  <ThemedText style={[styles.quickChipText, { color: theme.primary }]}>
+                    AC Repair service book karni hai ❄️
+                  </ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.quickChip, { borderColor: theme.primary }]}
+                  onPress={() => handleSend('Master Plumber chahiye plumbing ke liye')}
+                >
+                  <ThemedText style={[styles.quickChipText, { color: theme.primary }]}>
+                    Master Plumber chahiye plumbing ke liye 🚰
+                  </ThemedText>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        )}
+
+        <View style={[styles.inputArea, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <TouchableOpacity style={styles.plusButton}>
             <Plus size={24} color={theme.textSecondary} />
           </TouchableOpacity>
@@ -572,7 +691,7 @@ export default function ChatScreen() {
               style={styles.input}
               value={message}
               onChangeText={setMessage}
-              onSubmitEditing={handleSend}
+              onSubmitEditing={() => handleSend()}
               returnKeyType="send"
               editable={!isSending}
             />
@@ -584,7 +703,7 @@ export default function ChatScreen() {
           </View>
           <TouchableOpacity 
             style={[styles.sendButton, { backgroundColor: theme.primary }]}
-            onPress={handleSend}
+            onPress={() => handleSend()}
             disabled={isSending || !message.trim()}
           >
             <Send size={20} color="white" />
@@ -787,7 +906,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDF4',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
-    paddingBottom: Platform.OS === 'ios' ? 40 : Spacing.three,
   },
   plusButton: {
     marginRight: Spacing.two,
@@ -815,5 +933,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: Spacing.two,
+  },
+  quickChipsContainer: {
+    flexDirection: 'column',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.four,
+    paddingBottom: Spacing.three,
+    backgroundColor: 'transparent',
+  },
+  quickChip: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  quickChipText: {
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });

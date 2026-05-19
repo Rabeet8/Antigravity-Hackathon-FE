@@ -57,7 +57,7 @@ export const AgentTraceCard: React.FC<AgentTraceCardProps> = ({ trace, execution
           </View>
           <View>
             <ThemedText style={styles.title}>🤖 Agentic Reasoning Log</ThemedText>
-            {executionTime && (
+            {!!executionTime && (
               <ThemedText style={styles.subtitle}>
                 Executed in {executionTime}ms • {trace.length} steps completed
               </ThemedText>
