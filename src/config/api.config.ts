@@ -11,8 +11,5 @@ const getHostIp = () => {
 
 const hostIp = getHostIp();
 
-export const BASE_URL = hostIp 
-  ? `http://${hostIp}:3000/api` 
-  : (Platform.OS === 'android' ? 'http://10.0.2.2:3000/api' : 'http://localhost:3000/api');
+export const BASE_URL = process.env.EXPO_PUBLIC_API_URL
 
-console.log('[API Config] Resolved BASE_URL:', BASE_URL);
