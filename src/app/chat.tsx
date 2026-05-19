@@ -639,45 +639,22 @@ export default function ChatScreen() {
 
         {messages.length === 1 && !isSending && (
           <View style={styles.quickChipsContainer}>
-            {isWaterproofing ? (
-              <>
-                <TouchableOpacity 
-                  style={[styles.quickChip, { borderColor: theme.primary }]}
-                  onPress={() => handleSend('Yes, book Clifton for tomorrow morning')}
-                >
-                  <ThemedText style={[styles.quickChipText, { color: theme.primary }]}>
-                    Yes, book Clifton for tomorrow morning
-                  </ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.quickChip, { borderColor: theme.primary }]}
-                  onPress={() => handleSend('Show details & price first')}
-                >
-                  <ThemedText style={[styles.quickChipText, { color: theme.primary }]}>
-                    Show details & price first
-                  </ThemedText>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <TouchableOpacity 
-                  style={[styles.quickChip, { borderColor: theme.primary }]}
-                  onPress={() => handleSend('AC Repair service book karni hai Clifton ke liye')}
-                >
-                  <ThemedText style={[styles.quickChipText, { color: theme.primary }]}>
-                    AC Repair service book karni hai ❄️
-                  </ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.quickChip, { borderColor: theme.primary }]}
-                  onPress={() => handleSend('Master Plumber chahiye plumbing ke liye')}
-                >
-                  <ThemedText style={[styles.quickChipText, { color: theme.primary }]}>
-                    Master Plumber chahiye plumbing ke liye 🚰
-                  </ThemedText>
-                </TouchableOpacity>
-              </>
-            )}
+            <TouchableOpacity 
+              style={[styles.quickChip, { borderColor: theme.primary }]}
+              onPress={() => handleSend('AC Repair service book karni hai Clifton ke liye')}
+            >
+              <ThemedText style={[styles.quickChipText, { color: theme.primary }]}>
+                AC Repair service book karni hai ❄️
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.quickChip, { borderColor: theme.primary }]}
+              onPress={() => handleSend('Master Plumber chahiye plumbing ke liye')}
+            >
+              <ThemedText style={[styles.quickChipText, { color: theme.primary }]}>
+                Master Plumber chahiye plumbing ke liye 🚰
+              </ThemedText>
+            </TouchableOpacity>
           </View>
         )}
 
